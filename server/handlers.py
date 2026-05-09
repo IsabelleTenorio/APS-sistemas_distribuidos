@@ -29,17 +29,27 @@ def recv_line(sock: socket.socket, buf: list[str]) -> dict:
     Lê uma linha JSON completa do socket.
     `buf` é uma lista de um elemento usada como acumulador mutável.
     """
-    while True:
-        while "\n" not in buf[0]:
-            chunk = sock.recv(BUFFER_SIZE)
-            if not chunk:
-                raise ConnectionError("Conexão fechada pelo cliente.")
-            buf[0] += chunk.decode("utf-8", errors="replace")
-        line, buf[0] = buf[0].split("\n", 1)
-        line = line.strip()
-        if line:
-            return json.loads(line)
+    while "\n" not in buf[0]:
+        chunk = sock.recv(BUFFER_SIZE)
+        if not chunk:
+            raise ConnectionError("Conexão fechada pelo cliente.")
+        buf[0] += chunk.decode("utf-8", errors="replace")
+    line, buf[0] = buf[0].split("\n", 1)
+    return json.loads(line.strip())
 
+
+def recv_raw_line(sock: socket.socket, buf: list[str]) -> str:
+    """
+    Lê uma linha de texto puro do socket (sem deserializar JSON).
+    Usada pelo handler de admin, que recebe comandos como 'STATUS|id'.
+    """
+    while "\n" not in buf[0]:
+        chunk = sock.recv(BUFFER_SIZE)
+        if not chunk:
+            raise ConnectionError("Conexão fechada pelo cliente.")
+        buf[0] += chunk.decode("utf-8", errors="replace")
+    line, buf[0] = buf[0].split("\n", 1)
+    return line.strip()
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
@@ -57,17 +67,21 @@ def dispatch(conn: socket.socket, addr: tuple, registry: ServiceRegistry) -> Non
         conn.settimeout(None)
     except (socket.timeout, json.JSONDecodeError):
         conn.sendall(encode({"ok": False, "error": "Primeiro pacote deve ser JSON com campo 'role'."}))
+        conn.close()
         return
 
     role = hello.get("role", "").lower()
-    rest = buf[0]   # bytes já lidos além do primeiro \n
+    rest = buf[0]
 
-    if role == "probe":
-        handle_probe(conn, addr, registry, hello, rest)
-    elif role == "admin":
-        handle_admin(conn, addr, registry, rest)
-    else:
-        conn.sendall(encode({"ok": False, "error": "Campo 'role' deve ser 'probe' ou 'admin'."}))
+    try:
+        if role == "probe":
+            handle_probe(conn, addr, registry, hello, rest)
+        elif role == "admin":
+            handle_admin(conn, addr, registry, rest)
+        else:
+            conn.sendall(encode({"ok": False, "error": "Campo 'role' deve ser 'probe' ou 'admin'."}))
+    finally:
+        conn.close()
 
 
 # ── Handler de Probe ──────────────────────────────────────────────────────────
@@ -89,11 +103,10 @@ def handle_probe(conn: socket.socket, addr: tuple, registry: ServiceRegistry,
 
     buf = [initial_buf]
     try:
-        with conn:
-            while True:
-                msg = recv_line(conn, buf)
-                response = _process_probe_message(msg, service_id, registry)
-                conn.sendall(encode(response))
+        while True:
+            msg = recv_line(conn, buf)
+            response = _process_probe_message(msg, service_id, registry)
+            conn.sendall(encode(response))
     except (ConnectionResetError, BrokenPipeError, ConnectionError):
         pass
     except Exception as exc:
@@ -136,15 +149,12 @@ def handle_admin(conn: socket.socket, addr: tuple, registry: ServiceRegistry,
 
     buf = [initial_buf]
     try:
-        with conn:
-            while True:
-                raw = recv_line(conn, buf)
-                # Aceita tanto string (comando) quanto dict (extensibilidade futura)
-                cmd = raw if isinstance(raw, str) else raw.get("cmd", "")
-                response = _process_admin_command(cmd, registry, conn)
-                if response is None:
-                    break   # WATCH encerrou (cliente desconectou)
-                conn.sendall(encode(response))
+        while True:
+            cmd = recv_raw_line(conn, buf)
+            response = _process_admin_command(cmd, registry, conn)
+            if response is None:
+                break   # WATCH encerrou (cliente desconectou)
+            conn.sendall(encode(response))
     except (ConnectionResetError, BrokenPipeError, ConnectionError):
         pass
     except Exception as exc:

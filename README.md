@@ -9,10 +9,11 @@ Desenvolvido como parte de uma APS da disciplina **CIN0143 – Introdução aos 
  
 ```
 APS-sistemas_distribuidos/
+├── main.py              # Ponto de entrada único — roda tudo em 1 terminal
 ├── server/
 │   ├── registry.py      # Estrutura de dados em memória (sem rede)
 │   ├── handlers.py      # Lógica das conexões TCP (probe e admin)
-│   └── server.py        # Ponto de entrada: aceita conexões e despacha
+│   └── server.py        # Aceita conexões e despacha
 │
 ├── probe/
 │   └── demo_probes.py   # Probes simulados em threads
@@ -21,7 +22,7 @@ APS-sistemas_distribuidos/
 │   ├── colors.py        # Constantes ANSI e helpers de formatação
 │   ├── renderer.py      # Desenho do dashboard no terminal (sem rede)
 │   ├── client.py        # Conexão TCP com o servidor (sem UI)
-│   └── admin.py         # Ponto de entrada: menu → client + renderer
+│   └── admin.py         # Menu de administração
 │
 └── docs/
     └── protocol.md      # Documentação do protocolo TCP
@@ -50,34 +51,37 @@ Cada arquivo tem **menos de 200 linhas** e **uma única responsabilidade**.
  
 ---
  
-### Terminal 1 — Servidor
+### Terminal único
  
 ```bash
+cd APS-sistemas_distribuidos
+python main.py
+```
+ 
+O `main.py` sobe o servidor e os probes simulados automaticamente em background e abre o menu de administração no mesmo terminal.
+ 
+---
+ 
+### Alternativa: 3 terminais separados
+ 
+Útil se quiser ver os logs de cada componente individualmente.
+ 
+```bash
+# Terminal 1 — servidor
 cd APS-sistemas_distribuidos
 python -m server.server
 ```
  
----
- 
-### Terminal 2 — Probes simulados
- 
 ```bash
+# Terminal 2 — probes simulados
 cd APS-sistemas_distribuidos
 python -m probe.demo_probes --count 8 --interval 4
 ```
  
----
- 
-### Terminal 3 — Cliente administrador
- 
 ```bash
+# Terminal 3 — cliente administrador
 cd APS-sistemas_distribuidos
- 
-# Menu interativo
 python -m admin.admin
- 
-# Dashboard ao vivo direto
-python -m admin.admin --watch --interval 3
 ```
  
 ---
@@ -134,17 +138,8 @@ Thread-3  (Admin: watch)        →  registry.snapshot()        →  RLock
 ## 🧪 Teste rápido
  
 ```bash
-# Terminal 1
 cd APS-sistemas_distribuidos
-python -m server.server
- 
-# Terminal 2
-cd APS-sistemas_distribuidos
-python -m probe.demo_probes --count 8
- 
-# Terminal 3
-cd APS-sistemas_distribuidos
-python -m admin.admin --watch --interval 3
+python main.py
 ```
  
 ---
