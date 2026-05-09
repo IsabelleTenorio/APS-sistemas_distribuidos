@@ -20,23 +20,36 @@ N_PROBES = 8
 INTERVAL = 4   # segundos entre amostras dos probes
 
 
+def _wait_for_server(client: AdminClient, retries: int = 10, delay: float = 0.5) -> bool:
+    """Tenta conectar ao servidor repetidamente até ele estar pronto."""
+    for _ in range(retries):
+        try:
+            client.ping()
+            return True
+        except (ConnectionRefusedError, ConnectionError, OSError):
+            time.sleep(delay)
+    return False
+
+
 def main() -> None:
     # 1. Servidor em background
     print(f"  {C.CYAN}Iniciando servidor...{C.RESET}")
     start_background()
-    time.sleep(0.5)   # aguarda o socket estar pronto
 
-    # 2. Probes simulados em background
+    # 2. Aguarda o servidor estar pronto (até 5s)
+    client = AdminClient(HOST, PORT)
+    if not _wait_for_server(client):
+        print(f"  {C.RED}Erro: servidor não respondeu. Encerrando.{C.RESET}")
+        sys.exit(1)
+
+    # 3. Probes simulados em background
     print(f"  {C.CYAN}Iniciando {N_PROBES} probes simulados...{C.RESET}")
     start_probes_background(N_PROBES, INTERVAL)
-    time.sleep(1.0)   # aguarda os probes conectarem e enviarem a 1ª amostra
+    time.sleep(1.5)   # aguarda os probes enviarem a 1ª amostra
 
-    # 3. Abre o menu admin no terminal atual
+    # 4. Abre o menu admin no terminal atual
     print(f"  {C.GREEN}Sistema pronto!{C.RESET}\n")
-    client = AdminClient(HOST, PORT)
     try:
-        client.ping()   # verifica conectividade
-        print(f"  {C.GREEN}Admin conectado.{C.RESET}")
         run_menu(client)
     except ConnectionRefusedError:
         print(f"\n  {C.RED}Erro:{C.RESET} Não foi possível conectar ao servidor.")
@@ -44,7 +57,6 @@ def main() -> None:
     except KeyboardInterrupt:
         print(f"\n  {C.DIM}Interrompido.{C.RESET}")
     finally:
-        client.close()
         print(f"  {C.DIM}Encerrado.{C.RESET}")
 
 

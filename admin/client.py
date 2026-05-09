@@ -6,23 +6,20 @@ Cada comando abre sua própria conexão — sem estado compartilhado entre opera
 
 import socket
 import json
-from contextlib import contextmanager
 
 BUFFER_SIZE = 8192
 
 
 class AdminClient:
-    """
-    Cliente TCP para o servidor de administração.
-    Cada método de comando abre uma conexão, executa e fecha.
-    O modo WATCH mantém a conexão aberta enquanto o gerador estiver ativo.
-    """
 
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
 
     # ── Comandos do protocolo ─────────────────────────────────────────────
+
+    def ping(self) -> dict:
+        return self._one_shot("PING")
 
     def status(self, service_id: str | None = None) -> dict:
         cmd = f"STATUS|{service_id}" if service_id else "STATUS"
@@ -37,69 +34,67 @@ class AdminClient:
     def list_services(self) -> dict:
         return self._one_shot("LIST")
 
-    def ping(self) -> dict:
-        return self._one_shot("PING")
-
     def watch(self, interval: int = 5):
         """
-        Gerador que emite updates do servidor enquanto a conexão estiver aberta.
-        A conexão é fechada quando o gerador for abandonado (close() ou garbage collect).
+        Gerador que emite WATCH_UPDATEs enquanto a conexão estiver aberta.
+        A conexão é fechada quando o gerador sair do escopo.
         """
-        with self._connection() as (sock, buf):
-            _send_raw(sock, f"WATCH|{interval}")
-            _recv_line(sock, buf)   # ACK inicial
+        sock, buf = self._open()
+        try:
+            sock.sendall((_fmt("WATCH|{}".format(interval))).encode())
+            _recv(sock, buf)   # ACK do WATCH
             while True:
-                yield _recv_line(sock, buf)
-
-    # ── Conexão inicial (usado pelo main.py para verificar conectividade) ─
-
-    def connect(self) -> dict:
-        """Testa a conectividade e retorna a mensagem de boas-vindas."""
-        return self._one_shot("PING")
+                yield _recv(sock, buf)
+        finally:
+            _close(sock)
 
     def close(self) -> None:
-        pass   # sem estado persistente para fechar
+        pass   # sem estado persistente
 
     # ── Internos ──────────────────────────────────────────────────────────
 
     def _one_shot(self, cmd: str) -> dict:
-        """Abre conexão, envia um comando, lê resposta e fecha."""
-        with self._connection() as (sock, buf):
-            _send_raw(sock, cmd)
-            return _recv_line(sock, buf)
-
-    @contextmanager
-    def _connection(self):
-        """Abre conexão TCP, faz handshake admin, cede (sock, buf), fecha ao sair."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        buf  = [""]
+        sock, buf = self._open()
         try:
-            sock.connect((self.host, self.port))
-            _send_json(sock, {"role": "admin"})
-            _recv_line(sock, buf)   # descarta boas-vindas
-            yield sock, buf
+            sock.sendall(_fmt(cmd).encode())
+            return _recv(sock, buf)
         finally:
-            try:
-                sock.close()
-            except OSError:
-                pass
+            _close(sock)
+
+    def _open(self) -> tuple:
+        """Abre conexão TCP, faz handshake e descarta boas-vindas. Retorna (sock, buf)."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self.host, self.port))
+        buf = [""]
+        # Handshake: envia role=admin
+        sock.sendall((_fmt_json({"role": "admin"})).encode())
+        # Descarta boas-vindas do servidor
+        _recv(sock, buf)
+        return sock, buf
 
 
-# ── Funções de protocolo (módulo-privadas) ────────────────────────────────────
+# ── Helpers de protocolo ──────────────────────────────────────────────────────
 
-def _send_json(sock: socket.socket, obj: dict) -> None:
-    sock.sendall((json.dumps(obj, ensure_ascii=False) + "\n").encode())
+def _fmt(cmd: str) -> str:
+    return json.dumps(cmd.strip()) + "\n"
 
+def _fmt_json(obj: dict) -> str:
+    return json.dumps(obj, ensure_ascii=False) + "\n"
 
-def _send_raw(sock: socket.socket, text: str) -> None:
-    sock.sendall((text.strip() + "\n").encode())
+def _recv(sock: socket.socket, buf: list) -> dict:
+    while True:
+        while "\n" not in buf[0]:
+            chunk = sock.recv(BUFFER_SIZE)
+            if not chunk:
+                raise ConnectionError("Servidor desconectou.")
+            buf[0] += chunk.decode("utf-8", errors="replace")
+        line, buf[0] = buf[0].split("\n", 1)
+        line = line.strip()
+        if line:
+            return json.loads(line)
 
-
-def _recv_line(sock: socket.socket, buf: list[str]) -> dict:
-    while "\n" not in buf[0]:
-        chunk = sock.recv(BUFFER_SIZE)
-        if not chunk:
-            raise ConnectionError("Servidor desconectado.")
-        buf[0] += chunk.decode("utf-8", errors="replace")
-    line, buf[0] = buf[0].split("\n", 1)
-    return json.loads(line.strip())
+def _close(sock: socket.socket) -> None:
+    try:
+        sock.close()
+    except OSError:
+        pass

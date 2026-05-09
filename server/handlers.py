@@ -65,8 +65,11 @@ def dispatch(conn: socket.socket, addr: tuple, registry: ServiceRegistry) -> Non
         conn.settimeout(10)
         hello = recv_line(conn, buf)
         conn.settimeout(None)
-    except (socket.timeout, json.JSONDecodeError):
-        conn.sendall(encode({"ok": False, "error": "Primeiro pacote deve ser JSON com campo 'role'."}))
+    except (socket.timeout, json.JSONDecodeError, ConnectionResetError, OSError):
+        try:
+            conn.sendall(encode({"ok": False, "error": "Primeiro pacote deve ser JSON com campo 'role'."}))
+        except OSError:
+            pass
         conn.close()
         return
 
