@@ -29,13 +29,17 @@ def recv_line(sock: socket.socket, buf: list[str]) -> dict:
     Lê uma linha JSON completa do socket.
     `buf` é uma lista de um elemento usada como acumulador mutável.
     """
-    while "\n" not in buf[0]:
-        chunk = sock.recv(BUFFER_SIZE)
-        if not chunk:
-            raise ConnectionError("Conexão fechada pelo cliente.")
-        buf[0] += chunk.decode("utf-8", errors="replace")
-    line, buf[0] = buf[0].split("\n", 1)
-    return json.loads(line.strip())
+    while True:
+        while "\n" not in buf[0]:
+            chunk = sock.recv(BUFFER_SIZE)
+            if not chunk:
+                raise ConnectionError("Conexão fechada pelo cliente.")
+            buf[0] += chunk.decode("utf-8", errors="replace")
+        line, buf[0] = buf[0].split("\n", 1)
+        line = line.strip()
+        if line:
+            return json.loads(line)
+
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────

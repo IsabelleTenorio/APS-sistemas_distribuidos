@@ -78,7 +78,7 @@ class AdminClient:
         self._sock.sendall((json.dumps(obj, ensure_ascii=False) + "\n").encode())
 
     def _send_raw(self, text: str) -> None:
-        self._sock.sendall((text.strip() + "\n").encode())
+        self._sock.sendall((json.dumps(text.strip()) + "\n").encode())
 
     def _recv_line(self) -> dict:
         while "\n" not in self._buf:
