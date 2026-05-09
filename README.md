@@ -115,9 +115,9 @@ Todos os agentes conectam na **mesma porta 9999**. O papel é definido pelo **pr
 | `STATUS` | Estado de todos os serviços |
 | `STATUS\|id` | Estado de um serviço |
 | `SUMMARY` | Contadores globais + health score |
-| `HISTORY\|id[|n]` | Últimas N amostras |
+| `HISTORY\|id[n]` | Últimas N amostras |
 | `LIST` | IDs de todos os probes |
-| `WATCH[|segundos]` | Push automático periódico |
+| `WATCH[segundos]` | Push automático periódico |
 | `PING` | Verificação de conectividade |
  
 ---
