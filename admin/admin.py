@@ -37,13 +37,29 @@ def run_menu(client: AdminClient) -> None:
 
 
 def run_watch(client: AdminClient, interval: int) -> None:
-    """Modo watch direto, sem passar pelo menu."""
-    try:
-        for update in client.watch(interval):
-            if update.get("type") == "WATCH_UPDATE":
-                render_dashboard(update.get("summary", {}), update.get("services", {}))
-    except KeyboardInterrupt:
-        pass
+    """
+    Modo watch: atualiza o dashboard em uma thread separada.
+    Pressionar Enter na thread principal encerra o loop.
+    """
+    import threading
+
+    stop = threading.Event()
+
+    def _loop():
+        try:
+            for update in client.watch(interval):
+                if stop.is_set():
+                    break
+                if update.get("type") == "WATCH_UPDATE":
+                    render_dashboard(update.get("summary", {}), update.get("services", {}))
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+
+    input()   # aguarda Enter silenciosamente — o dashboard está na tela
+    stop.set()
 
 
 # ── Handlers de cada opção ────────────────────────────────────────────────────
@@ -57,13 +73,13 @@ def _cmd_summary(client: AdminClient) -> None:
 
 
 def _cmd_status_all(client: AdminClient) -> None:
-    resp = client.status()
-    if resp.get("ok"):
-        services = resp["data"]
-        render_dashboard({"total": len(services)}, services)
+    resp_status  = client.status()
+    resp_summary = client.summary()
+    if resp_status.get("ok") and resp_summary.get("ok"):
+        render_dashboard(resp_summary["data"], resp_status["data"])
         input(f"\n  {C.DIM}[Enter para continuar]{C.RESET}")
     else:
-        _print_error(resp)
+        _print_error(resp_status if not resp_status.get("ok") else resp_summary)
 
 
 def _cmd_status_one(client: AdminClient) -> None:
@@ -101,7 +117,7 @@ def _cmd_list(client: AdminClient) -> None:
 
 def _cmd_watch(client: AdminClient) -> None:
     interval = int(prompt("Intervalo em segundos", "5"))
-    print(f"  {C.DIM}Iniciando watch... Ctrl+C para voltar ao menu.{C.RESET}")
+    print(f"  {C.DIM}Iniciando watch... Pressione Enter para voltar ao menu.{C.RESET}")
     run_watch(client, interval)
 
 
@@ -144,10 +160,8 @@ def main() -> None:
     args   = _parse_args()
     client = AdminClient(args.server, args.port)
     try:
-        print(f"  Conectando a {args.server}:{args.port}...")
-        welcome = client.connect()
-        if welcome.get("ok"):
-            print(f"  {C.GREEN}Conectado!{C.RESET}  {welcome.get('message', '')}")
+        client.ping()
+        print(f"  {C.GREEN}Conectado ao servidor {args.server}:{args.port}{C.RESET}")
 
         if args.watch:
             run_watch(client, args.interval)

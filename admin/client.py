@@ -1,7 +1,7 @@
 """
 admin/client.py
-Gerencia a conexão TCP com o servidor central no papel de admin.
-Não sabe nada de cores, menus ou renderização — só protocolo.
+Gerencia a comunicação TCP com o servidor central no papel de admin.
+Cada comando abre sua própria conexão — sem estado compartilhado entre operações.
 """
 
 import socket
@@ -11,80 +11,90 @@ BUFFER_SIZE = 8192
 
 
 class AdminClient:
-    """
-    Conexão TCP persistente com o servidor no papel de admin.
-    Expõe métodos de alto nível que mapeiam 1-para-1 com os
-    comandos do protocolo (STATUS, SUMMARY, HISTORY, LIST, WATCH, PING).
-    """
 
     def __init__(self, host: str, port: int):
-        self.host  = host
-        self.port  = port
-        self._sock: socket.socket | None = None
-        self._buf  = ""
-
-    # ── Ciclo de vida ─────────────────────────────────────────────────────
-
-    def connect(self) -> dict:
-        """Abre conexão e faz handshake com role=admin. Retorna mensagem de boas-vindas."""
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._sock.connect((self.host, self.port))
-        self._buf = ""
-        self._send_json({"role": "admin"})
-        return self._recv_line()
-
-    def close(self) -> None:
-        if self._sock:
-            try:
-                self._sock.close()
-            except OSError:
-                pass
-            self._sock = None
+        self.host = host
+        self.port = port
 
     # ── Comandos do protocolo ─────────────────────────────────────────────
 
+    def ping(self) -> dict:
+        return self._one_shot("PING")
+
     def status(self, service_id: str | None = None) -> dict:
         cmd = f"STATUS|{service_id}" if service_id else "STATUS"
-        return self._cmd(cmd)
+        return self._one_shot(cmd)
 
     def summary(self) -> dict:
-        return self._cmd("SUMMARY")
+        return self._one_shot("SUMMARY")
 
     def history(self, service_id: str, last_n: int = 20) -> dict:
-        return self._cmd(f"HISTORY|{service_id}|{last_n}")
+        return self._one_shot(f"HISTORY|{service_id}|{last_n}")
 
     def list_services(self) -> dict:
-        return self._cmd("LIST")
-
-    def ping(self) -> dict:
-        return self._cmd("PING")
+        return self._one_shot("LIST")
 
     def watch(self, interval: int = 5):
         """
-        Gerador que emite updates do servidor indefinidamente.
-        Levanta StopIteration (ou a conexão cai) quando encerrado.
+        Gerador que emite WATCH_UPDATEs enquanto a conexão estiver aberta.
+        A conexão é fechada quando o gerador sair do escopo.
         """
-        self._cmd(f"WATCH|{interval}")   # ACK do servidor
-        while True:
-            yield self._recv_line()
+        sock, buf = self._open()
+        try:
+            sock.sendall((_fmt("WATCH|{}".format(interval))).encode())
+            _recv(sock, buf)   # ACK do WATCH
+            while True:
+                yield _recv(sock, buf)
+        finally:
+            _close(sock)
 
-    # ── Protocolo interno ─────────────────────────────────────────────────
+    def close(self) -> None:
+        pass   # sem estado persistente
 
-    def _cmd(self, raw: str) -> dict:
-        self._send_raw(raw)
-        return self._recv_line()
+    # ── Internos ──────────────────────────────────────────────────────────
 
-    def _send_json(self, obj: dict) -> None:
-        self._sock.sendall((json.dumps(obj, ensure_ascii=False) + "\n").encode())
+    def _one_shot(self, cmd: str) -> dict:
+        sock, buf = self._open()
+        try:
+            sock.sendall(_fmt(cmd).encode())
+            return _recv(sock, buf)
+        finally:
+            _close(sock)
 
-    def _send_raw(self, text: str) -> None:
-        self._sock.sendall((text.strip() + "\n").encode())
+    def _open(self) -> tuple:
+        """Abre conexão TCP, faz handshake e descarta boas-vindas. Retorna (sock, buf)."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self.host, self.port))
+        buf = [""]
+        # Handshake: envia role=admin
+        sock.sendall((_fmt_json({"role": "admin"})).encode())
+        # Descarta boas-vindas do servidor
+        _recv(sock, buf)
+        return sock, buf
 
-    def _recv_line(self) -> dict:
-        while "\n" not in self._buf:
-            chunk = self._sock.recv(BUFFER_SIZE)
+
+# ── Helpers de protocolo ──────────────────────────────────────────────────────
+
+def _fmt(cmd: str) -> str:
+    return json.dumps(cmd.strip()) + "\n"
+
+def _fmt_json(obj: dict) -> str:
+    return json.dumps(obj, ensure_ascii=False) + "\n"
+
+def _recv(sock: socket.socket, buf: list) -> dict:
+    while True:
+        while "\n" not in buf[0]:
+            chunk = sock.recv(BUFFER_SIZE)
             if not chunk:
-                raise ConnectionError("Servidor desconectado.")
-            self._buf += chunk.decode("utf-8", errors="replace")
-        line, self._buf = self._buf.split("\n", 1)
-        return json.loads(line.strip())
+                raise ConnectionError("Servidor desconectou.")
+            buf[0] += chunk.decode("utf-8", errors="replace")
+        line, buf[0] = buf[0].split("\n", 1)
+        line = line.strip()
+        if line:
+            return json.loads(line)
+
+def _close(sock: socket.socket) -> None:
+    try:
+        sock.close()
+    except OSError:
+        pass

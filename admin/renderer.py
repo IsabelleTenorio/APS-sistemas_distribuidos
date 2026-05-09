@@ -27,7 +27,7 @@ def render_dashboard(summary: dict, services: dict) -> None:
             _service_row(svc)
 
     _border_bottom()
-    print(f"\n{C.DIM}  Pressione Ctrl+C para encerrar  |  modo: WATCH{C.RESET}")
+    print(f"\n{C.DIM}  Pressione Enter para voltar ao menu  |  modo: WATCH{C.RESET}")
 
 
 def render_history(service_id: str, samples: list) -> None:

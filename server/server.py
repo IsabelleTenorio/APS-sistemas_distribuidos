@@ -22,6 +22,11 @@ logging.basicConfig(
 log = logging.getLogger("server")
 
 
+def start_background() -> None:
+    """Sobe o servidor em uma thread daemon e retorna imediatamente."""
+    threading.Thread(target=start, daemon=True).start()
+
+
 def start() -> None:
     registry = ServiceRegistry()
 
