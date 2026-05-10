@@ -28,24 +28,22 @@ APS-sistemas_distribuidos/
     └── protocol.md      # Documentação do protocolo TCP
 ```
  
-Cada arquivo tem **menos de 200 linhas** e **uma única responsabilidade**.
- 
 ---
  
 ## ✨ Funcionalidades
  
-- **Probes simulados** — múltiplos probes em threads, cada um com métricas geradas com variação realista
-- **Agregação em memória** — histórico circular das últimas 60 amostras por serviço (`deque`)
-- **Cliente administrador** — dashboard ao vivo (modo `WATCH`) e consultas pontuais
-- **Múltiplas conexões simultâneas** — thread daemon por conexão, despacho por `role`
-- **Mesma porta para probes e admins** — o primeiro pacote JSON define o papel
+- **Probes simulados** - múltiplos probes em threads, cada um com métricas geradas com variação realista
+- **Agregação em memória** - histórico circular das últimas 60 amostras por serviço (`deque`)
+- **Cliente administrador** - dashboard ao vivo (modo `WATCH`) e consultas pontuais
+- **Múltiplas conexões simultâneas** - thread daemon por conexão, despacho por `role`
+- **Mesma porta para probes e admins** - o primeiro pacote JSON define o papel
 ---
  
 ## 🚀 Como Rodar
  
 ### Pré-requisitos
  
-- Python **3.10+** — sem dependências externas, apenas biblioteca padrão
+- Python **3.10+** - sem dependências externas, apenas biblioteca padrão
 > ⚠️ Todos os comandos abaixo devem ser executados a partir da pasta raiz `APS-sistemas_distribuidos/`.  
 > O prefixo `-m` é necessário porque os módulos usam importações relativas.
  
