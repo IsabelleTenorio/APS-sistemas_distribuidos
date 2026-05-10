@@ -54,7 +54,7 @@ class AdminClient:
     # ── Internos ──────────────────────────────────────────────────────────
 
     def _one_shot(self, cmd: str) -> dict:
-        sock, buf = self._open()
+        sock, buf = self._open()  # conecta + handshake admin
         try:
             sock.sendall(_fmt(cmd).encode())
             return _recv(sock, buf)
@@ -62,7 +62,6 @@ class AdminClient:
             _close(sock)
 
     def _open(self) -> tuple:
-        """Abre conexão TCP, faz handshake e descarta boas-vindas. Retorna (sock, buf)."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.host, self.port))
         buf = [""]
@@ -76,7 +75,7 @@ class AdminClient:
 # ── Helpers de protocolo ──────────────────────────────────────────────────────
 
 def _fmt(cmd: str) -> str:
-    return json.dumps(cmd.strip()) + "\n"
+    return cmd.strip() + "\n" 
 
 def _fmt_json(obj: dict) -> str:
     return json.dumps(obj, ensure_ascii=False) + "\n"

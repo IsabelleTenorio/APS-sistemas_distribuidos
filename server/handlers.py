@@ -1,8 +1,4 @@
-"""
-server/handlers.py
-Funções que gerenciam cada conexão TCP aberta.
-Não sabe nada sobre como o servidor aceita conexões — só como processá-las.
-"""
+# Lê pacote JSON e vê o role dele, e chama o seu probe
 
 import socket
 import json
@@ -25,10 +21,8 @@ def encode(obj: dict) -> bytes:
 
 
 def recv_line(sock: socket.socket, buf: list[str]) -> dict:
-    """
-    Lê uma linha JSON completa do socket.
-    `buf` é uma lista de um elemento usada como acumulador mutável.
-    """
+    # buf é uma lista de um elemento usada como acumulador mutável
+ 
     while "\n" not in buf[0]:
         chunk = sock.recv(BUFFER_SIZE)
         if not chunk:
@@ -39,10 +33,8 @@ def recv_line(sock: socket.socket, buf: list[str]) -> dict:
 
 
 def recv_raw_line(sock: socket.socket, buf: list[str]) -> str:
-    """
-    Lê uma linha de texto puro do socket (sem deserializar JSON).
-    Usada pelo handler de admin, que recebe comandos como 'STATUS|id'.
-    """
+    # Lê uma linha de texto puro do socket (sem deserializar JSON) pois recebe comandos como 'STATUS|id'.
+ 
     while "\n" not in buf[0]:
         chunk = sock.recv(BUFFER_SIZE)
         if not chunk:
@@ -55,11 +47,6 @@ def recv_raw_line(sock: socket.socket, buf: list[str]) -> str:
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 def dispatch(conn: socket.socket, addr: tuple, registry: ServiceRegistry) -> None:
-    """
-    Lê o primeiro pacote JSON para determinar o papel da conexão:
-      role="probe"  →  handle_probe()
-      role="admin"  →  handle_admin()
-    """
     buf = [""]
     try:
         conn.settimeout(10)
@@ -91,10 +78,8 @@ def dispatch(conn: socket.socket, addr: tuple, registry: ServiceRegistry) -> Non
 
 def handle_probe(conn: socket.socket, addr: tuple, registry: ServiceRegistry,
                  hello: dict, initial_buf: str) -> None:
-    """
-    Mantém a conexão aberta com um probe.
-    O 'hello' já contém os metadados de registro.
-    """
+    # Mantém a conexão aberta com um probe. O 'hello' já contém os metadados de registro.
+
     service_id = hello.get("service_id")
     if not service_id:
         conn.sendall(encode({"ok": False, "error": "service_id obrigatório."}))
@@ -106,7 +91,7 @@ def handle_probe(conn: socket.socket, addr: tuple, registry: ServiceRegistry,
 
     buf = [initial_buf]
     try:
-        while True:
+        while True: # Entra em loop lendo amostras
             msg = recv_line(conn, buf)
             response = _process_probe_message(msg, service_id, registry)
             conn.sendall(encode(response))
@@ -140,10 +125,9 @@ def _process_probe_message(msg: dict, service_id: str, registry: ServiceRegistry
 
 def handle_admin(conn: socket.socket, addr: tuple, registry: ServiceRegistry,
                  initial_buf: str) -> None:
-    """
-    Atende comandos de um cliente administrador.
-    Suporta consultas pontuais e o modo WATCH (push periódico).
-    """
+    # Atende comandos de um cliente administrador.
+    # Suporta consultas pontuais e o modo WATCH (push periódico).
+
     conn.sendall(encode({
         "ok": True,
         "message": "Admin conectado. Comandos: STATUS[|id], SUMMARY, HISTORY|id[|n], LIST, WATCH[|s], PING",
@@ -183,7 +167,7 @@ def _process_admin_command(cmd: str, registry: ServiceRegistry,
         if len(parts) < 2:
             return {"ok": False, "error": "Uso: HISTORY|service_id[|n]"}
         sid  = parts[1]
-        n    = int(parts[2]) if len(parts) > 2 else 20
+        n = max(1, min(int(parts[2]), 60)) if len(parts) > 2 else 20
         return {"ok": True, "service_id": sid, "samples": registry.history(sid, n)}
 
     if action == "LIST":

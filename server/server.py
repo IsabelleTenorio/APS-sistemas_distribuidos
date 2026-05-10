@@ -1,8 +1,4 @@
-"""
-server/server.py
-Ponto de entrada do servidor central.
-Só faz uma coisa: aceitar conexões e delegar para handlers.py.
-"""
+# Aceitar conexões e despachar
 
 import socket
 import threading
@@ -23,7 +19,7 @@ log = logging.getLogger("server")
 
 
 def start_background() -> None:
-    """Sobe o servidor em uma thread daemon e retorna imediatamente."""
+    # Sobe o servidor em uma thread daemon e retorna imediatamente
     threading.Thread(target=start, daemon=True).start()
 
 
@@ -42,7 +38,7 @@ def start() -> None:
         log.info("═" * 52)
 
         try:
-            while True:
+            while True: # Bloqueia até alguém conectar
                 conn, addr = srv.accept()
                 threading.Thread(
                     target=dispatch,

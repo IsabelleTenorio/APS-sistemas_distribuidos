@@ -81,7 +81,7 @@ def render_summary(data: dict) -> None:
 # ── Helpers internos ──────────────────────────────────────────────────────────
 
 def _border_top() -> None:
-    print(f"{C.BOLD}{C.BLUE}╔{'═' * (WIDTH - 2)}╗{C.RESET}")
+    (f"{C.BOLD}{C.BLUE}╔{'═' * (WIDTH - 2)}╗{C.RESET}")
 
 
 def _border_bottom() -> None:

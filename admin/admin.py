@@ -1,9 +1,4 @@
-"""
-admin/admin.py
-Ponto de entrada do cliente administrador.
-Orquestra AdminClient (rede) + renderer (visual) + colors (UI).
-Cada função do menu tem uma única responsabilidade.
-"""
+# Ponto de entrada do cliente administrador.
 
 import argparse
 import sys
@@ -37,10 +32,9 @@ def run_menu(client: AdminClient) -> None:
 
 
 def run_watch(client: AdminClient, interval: int) -> None:
-    """
-    Modo watch: atualiza o dashboard em uma thread separada.
-    Pressionar Enter na thread principal encerra o loop.
-    """
+ 
+    # Modo watch: atualiza o dashboard em uma thread separada de N em N seg
+  
     import threading
 
     stop = threading.Event()

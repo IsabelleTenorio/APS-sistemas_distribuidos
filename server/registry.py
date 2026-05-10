@@ -1,8 +1,4 @@
-"""
-server/registry.py
-Estrutura de dados em memória para o estado de todos os serviços monitorados.
-Não sabe nada sobre sockets ou rede — pura lógica de domínio.
-"""
+# Estrutura de dados em memória para o estado de todos os serviços monitorados.
 
 import threading
 from datetime import datetime
@@ -12,15 +8,12 @@ MAX_HISTORY = 60  # últimas N amostras por serviço
 
 
 class ServiceRegistry:
-    """
-    Repositório thread-safe de métricas de serviços.
-
-    Cada serviço armazena:
-      - Metadados (nome, host, tags)
-      - Status atual (UP / DOWN / DEGRADED / OFFLINE / CONNECTING)
-      - Última latência e uptime calculado
-      - Histórico circular das últimas MAX_HISTORY amostras
-    """
+   
+   # Cada serviço armazena:
+     # - Metadados (nome, host, tags)
+     # - Status atual (UP / DOWN / DEGRADED / OFFLINE / CONNECTING)
+     # - Última latência e uptime calculado
+     # - Histórico circular das últimas MAX_HISTORY amostras
 
     def __init__(self):
         self._lock = threading.RLock()

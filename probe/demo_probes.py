@@ -106,7 +106,7 @@ def _run_probe(svc: dict, interval: int) -> None:
             ack = conn.recv()
             if not ack.get("ok"):
                 raise ConnectionError(f"Registro recusado: {ack.get('error')}")
-            print(f"  [probe] {sid:<20} conectado")
+            (f"  [probe] {sid:<20} conectado")
 
             # 2. Loop de amostras: envia → aguarda ACK → aguarda intervalo
             while True:
@@ -116,7 +116,7 @@ def _run_probe(svc: dict, interval: int) -> None:
                 time.sleep(interval + random.uniform(-0.5, 0.5))
 
         except Exception as exc:
-            print(f"  [probe] {sid:<20} reconectando em 3s... ({exc})")
+            (f"  [probe] {sid:<20} reconectando em 3s... ({exc})")
         finally:
             if conn:
                 conn.close()
@@ -150,8 +150,8 @@ def main() -> None:
     SERVER_PORT = args.port
 
     services = DEMO_SERVICES[: args.count]
-    print(f"\n  Iniciando {len(services)} probe(s) → {args.server}:{args.port}")
-    print(f"  Intervalo: {args.interval}s   |   Ctrl+C para encerrar\n")
+    (f"\n  Iniciando {len(services)} probe(s) → {args.server}:{args.port}")
+    (f"  Intervalo: {args.interval}s   |   Ctrl+C para encerrar\n")
 
     for svc in services:
         threading.Thread(
@@ -165,7 +165,7 @@ def main() -> None:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n  Demo encerrado.")
+        ("\n  Demo encerrado.")
 
 
 if __name__ == "__main__":
