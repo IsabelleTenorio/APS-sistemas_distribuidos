@@ -1,10 +1,3 @@
-"""
-main.py
-Ponto de entrada único do sistema.
-Sobe o servidor e os probes simulados em threads de fundo
-e abre o menu de administração no terminal atual.
-"""
-
 import time
 import sys
 
